@@ -8,6 +8,7 @@ body{margin:0;font-family:Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe
 .controls{display:flex;align-items:center;gap:8px}
 .user{font-size:13px;color:var(--muted);margin-right:8px}
 button{cursor:pointer}
+.controls #loginBtn{display:none}
 
 main{padding:16px}
 .add-board{position:fixed;right:16px;bottom:16px;background:transparent;display:flex;gap:8px;align-items:center}
@@ -16,7 +17,10 @@ main{padding:16px}
 
 .boards{display:flex;gap:16px;overflow:auto;padding-bottom:40px}
 .board{min-width:320px;background:transparent}
-.board h3{margin:6px 0 8px}
+.board-header{display:flex;justify-content:space-between;align-items:center;margin:6px 0 8px}
+.board-header h3{margin:0}
+.delete-board{background:transparent;border:none;color:var(--muted);font-size:20px;padding:4px 8px;border-radius:4px;line-height:1}
+.delete-board:hover{background:rgba(0,0,0,0.05);color:var(--danger)}
 .lists{display:flex;gap:12px}
 .list{width:260px;background:var(--card);padding:10px;border-radius:8px;box-shadow:0 4px 14px rgba(20,20,20,0.04)}
 .list-header{display:flex;justify-content:space-between;align-items:center}
@@ -31,13 +35,10 @@ main{padding:16px}
 .hidden{display:none}
 
 .modal{position:fixed;inset:0;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center}
-.modal.hidden{display:none}
-.modal-card{background:var(--card);padding:18px;border-radius:10px;min-width:320px;position:relative}
+.modal-card{background:var(--card);padding:18px;border-radius:10px;min-width:320px}
 .modal-card input{width:100%;padding:8px;margin:6px 0;border-radius:6px;border:1px solid #ddd}
 .row{display:flex;gap:8px}
 .muted{color:var(--muted)}
-.modal-close{position:absolute;right:12px;top:8px;border:0;background:transparent;font-size:20px;line-height:1;color:var(--muted);cursor:pointer;padding:6px;border-radius:6px}
-.modal-close:hover{background:rgba(0,0,0,0.04)}
 
 .empty{padding:24px;color:var(--muted)}
 
