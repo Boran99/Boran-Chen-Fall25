@@ -11,6 +11,7 @@
 			<div class="brand">Job Planner</div>
 			<div class="controls">
 				<!-- login removed: app is single-user client-only -->
+				<button id="fireworkBtn" class="firework-btn" title="Show fireworks" aria-label="Show fireworks">🎆</button>
 			</div>
 		</header>
 
@@ -136,10 +137,17 @@
 							const cardEl = cnode.querySelector('.card-item');
 							if(card.done) cardEl.classList.add('done');
 							completeBtn.addEventListener('click', (ev)=>{
-								card.done = !card.done;
+								// compute next state first
+								const willBeDone = !card.done;
+								// celebrate at the card position before we re-render (read bounding rect while element is in DOM)
+								if(willBeDone){
+									try{
+										const rect = cardEl.getBoundingClientRect();
+										if(window.showFireworks) window.showFireworks({ getBoundingClientRect: () => rect });
+									}catch(e){}
+								}
+								card.done = willBeDone;
 								saveState(); render();
-								// celebrate when a task is marked done
-								if(card.done){ try{ if(window.showFireworks) window.showFireworks(cardEl); }catch(e){} }
 							});
 							// set countdown element dataset for ticking
 							const countdown = cnode.querySelector('.countdown');

@@ -78,15 +78,20 @@ window.showFireworks = function(targetEl){
 
   // choose base position
   let baseX = window.innerWidth/2, baseY = window.innerHeight*0.35;
-  if(targetEl && targetEl.getBoundingClientRect){
-    const r = targetEl.getBoundingClientRect();
-    baseX = r.left + r.width/2;
-    baseY = r.top + r.height/2;
+  if(targetEl && typeof targetEl.getBoundingClientRect === 'function'){
+    try{
+      const r = targetEl.getBoundingClientRect();
+      // if rect is empty (detached element) fall back to center
+      if(r && (r.width || r.height || r.left || r.top)){
+        baseX = r.left + (r.width || 0)/2;
+        baseY = r.top + (r.height || 0)/2;
+      }
+    }catch(e){ /* ignore and use default center */ }
   }
 
-  // spawn several bursts
-  for(let i=0;i<4;i++){
-    setTimeout(()=> spawnBurst(baseX + rand(-60,60), baseY + rand(-40,40), 40), i*120);
+  // spawn several bursts with more particles
+  for(let i=0;i<6;i++){
+    setTimeout(()=> spawnBurst(baseX + rand(-80,80), baseY + rand(-60,60), 80), i*150);
   }
 
   let rafId = null;
@@ -112,3 +117,9 @@ window.showFireworks = function(targetEl){
     if(canvas.parentNode) canvas.parentNode.removeChild(canvas);
   }, 3000);
 };
+
+// Attach UI test button (if present) to trigger fireworks
+try{
+  const btn = document.getElementById('fireworkBtn');
+  if(btn){ btn.addEventListener('click', ()=>{ try{ window.showFireworks(); }catch(e){ console.error(e); } }); }
+}catch(e){/* ignore */}

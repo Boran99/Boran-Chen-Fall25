@@ -46,6 +46,17 @@ body{
     align-items:center;
     gap:8px;
 
+
+.firework-btn{
+    background:transparent;
+    border:1px solid rgba(0,0,0,0.06);
+    padding:6px 8px;
+    border-radius:8px;
+    font-size:16px;
+    line-height:1;
+    cursor:pointer;
+}
+.firework-btn:hover{background:rgba(79,70,229,0.06)}
 /* entrance / removal animations */
 .board.enter{animation:boardIn .28s ease both}
 .board.removing{animation:boardOut .22s ease both}
