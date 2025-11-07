@@ -8,3 +8,11 @@ Future Plans:
 Add the fireworks effect when user finish a tag (current debuging it)
 add the delete tag function(it's in)
 Use java to handle more function
+
+Nov 6 update
+
+add the fire work, finishing debug
+change firework effect to css, It finally work
+
+Future plans:
+Trying to make this page layout more resonable

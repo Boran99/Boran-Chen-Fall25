@@ -297,3 +297,28 @@ main{padding:16px}
 /* fireworks canvas */
 .fireworks-canvas{position:fixed;inset:0;pointer-events:none;z-index:9999}
 
+/* CSS Fireworks (no canvas) */
+.fw-overlay{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:visible}
+.fw-burst{position:absolute;left:0;top:0;transform:translate(-50%,-50%)}
+.fw-spark{
+    position:absolute;
+    left:0;top:0;
+    background:var(--c,#fff);
+    border-radius:50%;
+    box-shadow:0 0 10px var(--c,#fff), 0 0 20px var(--c,#fff);
+    transform:translate(0,0) rotate(var(--ang,0deg));
+    animation:fw-spark-move 900ms cubic-bezier(.2,.8,.1,1) forwards,
+                        fw-spark-fade 900ms ease-out forwards;
+}
+
+@keyframes fw-spark-move{
+    0%{ transform: translate(0,0) rotate(var(--ang)) translate(0); }
+    80%{ transform: translate(0,0) rotate(var(--ang)) translate(var(--dist,120px)); }
+    100%{ transform: translate(0,0) rotate(var(--ang)) translate(calc(var(--dist,120px) * 1.05)); }
+}
+@keyframes fw-spark-fade{
+    0%{ opacity:1; }
+    60%{ opacity:1; }
+    100%{ opacity:0; }
+}
+
