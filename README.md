@@ -20,11 +20,12 @@ add float animation, got some bugs and fixing now.
 big change to the board function. now the task board will automatic move from 3 boards
 add the start time and end time
 add the count down
+add the drag function
+
 LOTS of bug fix
 LOTS LOTS of bug fix
 change float animation to make it more resonable.
 
 
 Future plans:
-Trying to make this page layout more resonable
-Going to add more css animation in the project
+trying to add the function that could add time
