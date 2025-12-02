@@ -37,9 +37,38 @@
 				<div class="cards"></div>
 				<div class="add-card-row hidden">
 					<input class="card-title" placeholder="Card title" />
-					<input class="card-due" type="datetime-local" />
 					<div class="row">
-						<button class="save-card">Add</button>
+						<div class="time-field">
+							<div class="time-label">Start Time</div>
+							<input class="card-start" type="text" placeholder="Select…" readonly />
+							<div class="inline-picker start-picker hidden">
+								<div class="picker-row">
+									<input class="start-date" type="date" />
+									<input class="start-time" type="time" />
+								</div>
+								<div class="picker-actions">
+									<button class="apply-start">Apply</button>
+									<button class="cancel-start">Cancel</button>
+								</div>
+							</div>
+						</div>
+						<div class="time-field">
+							<div class="time-label">End Time</div>
+							<input class="card-end" type="text" placeholder="Select…" readonly />
+							<div class="inline-picker end-picker hidden">
+								<div class="picker-row">
+									<input class="end-date" type="date" />
+									<input class="end-time" type="time" />
+								</div>
+								<div class="picker-actions">
+									<button class="apply-end">Apply</button>
+									<button class="cancel-end">Cancel</button>
+								</div>
+							</div>
+						</div>
+					</div>
+						<div class="row">
+							<button class="save-card">Add</button>
 						<button class="cancel-card">Cancel</button>
 					</div>
 				</div>
@@ -81,6 +110,66 @@
 
 			function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 
+			// === Workflow helpers (small task board) ===
+			function getList(board, listName){ return board.lists.find(l => l.name.toLowerCase() === listName.toLowerCase()); }
+			function ensureList(board, listName){
+				let l = getList(board, listName);
+				if(!l){ l = { name: listName, cards: [] }; board.lists.push(l); saveState(); }
+				return l;
+			}
+			function moveCardWithinBoard(cardId, boardId, fromListName, toListName){
+				const board = state.boards.find(b => b.id === boardId);
+				if(!board) return false;
+				let fromList = getList(board, fromListName);
+				// If not found in the expected list, search across all lists to be robust
+				let idx = fromList ? fromList.cards.findIndex(c => c.id === cardId) : -1;
+				if(idx === -1){
+					for(const l of board.lists){
+						const i = l.cards.findIndex(c => c.id === cardId);
+						if(i !== -1){ fromList = l; idx = i; break; }
+					}
+				}
+				if(!fromList || idx === -1) return false;
+				const [card] = fromList.cards.splice(idx,1);
+				const toList = ensureList(board, toListName);
+				toList.cards.push(card);
+				saveState();
+				return true;
+			}
+			// schedule a future move within the same board (demo; will not survive reload)
+			function scheduleMove(when, cardId, boardId, fromListName, toListName){
+				const now = Date.now(); const ts = typeof when === 'string' ? Date.parse(when) : when instanceof Date ? when.getTime() : now;
+				const delay = Math.max(0, ts - now);
+				setTimeout(()=>{ moveCardWithinBoard(cardId, boardId, fromListName, toListName); render(); }, delay);
+			}
+
+			// compose local date+time into a Unix timestamp (ms since epoch)
+			function toLocalTs(dateStr, timeStr){
+				try{
+					const [y,m,d] = dateStr.split('-').map(Number);
+					const [hh,mm] = timeStr.split(':').map(Number);
+					const dt = new Date(y, (m||1)-1, d||1, hh||0, mm||0, 0);
+					return dt.getTime();
+				}catch(e){ return null; }
+			}
+
+			function moveCardAcrossBoards(cardId, fromBoardId, fromListName, toBoardId, toListName){
+				const fromBoard = state.boards.find(b => b.id === fromBoardId);
+				const toBoard = state.boards.find(b => b.id === toBoardId);
+				if(!fromBoard || !toBoard) return false;
+				let fromList = getList(fromBoard, fromListName);
+				let idx = fromList ? fromList.cards.findIndex(c => c.id === cardId) : -1;
+				if(idx === -1){
+					for(const l of fromBoard.lists){ const i = l.cards.findIndex(c => c.id === cardId); if(i !== -1){ fromList = l; idx = i; break; } }
+				}
+				if(!fromList || idx === -1) return false;
+				const [card] = fromList.cards.splice(idx,1);
+				const toList = getList(toBoard, toListName) || ensureList(toBoard, toListName);
+				toList.cards.push(card);
+				saveState();
+				return true;
+			}
+
 
 
 			function render(){
@@ -88,20 +177,19 @@
 				if(state.boards.length === 0){ emptyEl.style.display = 'block'; } else { emptyEl.style.display = 'none'; }
 				state.boards.forEach((board, bi) =>{
 					const boardEl = document.createElement('section');
-					boardEl.className = 'board';
+					// mark small task board if it has only one list (our small-board default)
+					boardEl.className = 'board' + (board.lists && board.lists.length === 1 ? ' small-board' : '');
 					boardEl.innerHTML = `<div class="board-header"><h3>${escapeHtml(board.name)}</h3><button class="delete-board" title="Delete board">×</button></div><div class='lists'></div>`;
 					// tag the element with the board id for external control/animations
 					boardEl.dataset.boardId = board.id;
 					const listsEl = boardEl.querySelector('.lists');
 					
-					// Delete button delegates to global requestDeleteBoard so we can animate first
-					const deleteBtn = boardEl.querySelector('.delete-board');
-					deleteBtn.addEventListener('click', () => {
-						if (confirm('Are you sure you want to delete this board and all its contents?')) {
+						// Delete button delegates to global requestDeleteBoard so we can animate first (no pop-up)
+						const deleteBtn = boardEl.querySelector('.delete-board');
+						deleteBtn.addEventListener('click', () => {
 							if (window.requestDeleteBoard) window.requestDeleteBoard(board.id);
 							else { state.boards.splice(bi, 1); saveState(); render(); }
-						}
-					});
+						});
 					board.lists.forEach((list, li) =>{
 						const node = listTemplate.content.cloneNode(true);
 						const listEl = node.querySelector('.list');
@@ -111,30 +199,120 @@
 						const saveBtn = node.querySelector('.save-card');
 						const cancelBtn = node.querySelector('.cancel-card');
 						const titleInput = node.querySelector('.card-title');
-						const dueInput = node.querySelector('.card-due');
+						const startInput = node.querySelector('.card-start');
+						const endInput = node.querySelector('.card-end');
+						const startPicker = node.querySelector('.start-picker');
+						const endPicker = node.querySelector('.end-picker');
+						const startDate = node.querySelector('.start-date');
+						const startTime = node.querySelector('.start-time');
+						const endDate = node.querySelector('.end-date');
+						const endTime = node.querySelector('.end-time');
+						const applyStartBtn = node.querySelector('.apply-start');
+						const cancelStartBtn = node.querySelector('.cancel-start');
+						const applyEndBtn = node.querySelector('.apply-end');
+						const cancelEndBtn = node.querySelector('.cancel-end');
 						const cardsContainer = node.querySelector('.cards');
 
 						addBtn.addEventListener('click', ()=>{ addRow.classList.toggle('hidden'); titleInput.focus(); });
-						cancelBtn.addEventListener('click', ()=>{ addRow.classList.add('hidden'); titleInput.value=''; dueInput.value=''; });
-						saveBtn.addEventListener('click', ()=>{
+						// open custom pickers
+						startInput.addEventListener('click', ()=>{ startPicker.classList.remove('hidden'); });
+						endInput.addEventListener('click', ()=>{ endPicker.classList.remove('hidden'); });
+						cancelStartBtn.addEventListener('click', ()=>{ startPicker.classList.add('hidden'); });
+						cancelEndBtn.addEventListener('click', ()=>{ endPicker.classList.add('hidden'); });
+											applyStartBtn.addEventListener('click', ()=>{
+												if(startDate.value && startTime.value){
+													const ts = toLocalTs(startDate.value, startTime.value);
+													startInput.value = `${startDate.value} ${startTime.value}`;
+													startInput.dataset.ts = String(ts);
+												}
+												startPicker.classList.add('hidden');
+											});
+											applyEndBtn.addEventListener('click', ()=>{
+												if(endDate.value && endTime.value){
+													const ts = toLocalTs(endDate.value, endTime.value);
+													endInput.value = `${endDate.value} ${endTime.value}`;
+													endInput.dataset.ts = String(ts);
+												}
+												endPicker.classList.add('hidden');
+											});
+						cancelBtn.addEventListener('click', ()=>{ addRow.classList.add('hidden'); titleInput.value=''; if(startInput){ startInput.value=''; startInput.dataset.iso=''; } if(endInput){ endInput.value=''; endInput.dataset.iso=''; } });
+
+
+
+
+											saveBtn.addEventListener('click', ()=>{
 							const title = titleInput.value.trim();
-							const due = dueInput.value ? new Date(dueInput.value).toISOString() : null;
+												const startTs = startInput && startInput.dataset.ts ? Number(startInput.dataset.ts) : null;
+												const endTs = endInput && endInput.dataset.ts ? Number(endInput.dataset.ts) : null;
 							if(!title) return alert('Title required');
-							const card = { id: Date.now()+Math.random(), title, due, created: new Date().toISOString(), done: false };
+												if(startTs && endTs){
+													if(endTs < startTs){
+									alert('End Time cannot be earlier than Start Time');
+									return;
+								}
+							}
+												const start = startTs ? new Date(startTs).toISOString() : null;
+												const end = endTs ? new Date(endTs).toISOString() : null;
+												const card = { id: Date.now()+Math.random(), title, start, end, created: new Date().toISOString(), done: false };
 							state.boards[bi].lists[li].cards.push(card);
 							saveState();
 							render();
-							// schedule notification if due
-							scheduleReminder(card);
+							// schedule moves based on start/end times within same (small) board
+							try{
+								const currentBoardId = state.boards[bi].id;
+								const now = new Date();
+								if(start){
+									const startAt = new Date(start);
+									if(startAt <= now){
+										// if start is now/past, move to Doing immediately
+										moveCardWithinBoard(card.id, currentBoardId, list.name, 'Doing');
+										render();
+									} else {
+										// schedule move to Doing
+										scheduleMove(startAt, card.id, currentBoardId, list.name, 'Doing');
+									}
+								}
+								if(end){
+									const endAt = new Date(end);
+									// Only schedule if end is in the future and, if start exists, end is after start
+									if(endAt > now && (!start || endAt > new Date(start))){
+										// schedule move to Done from whichever list contains the card at execution
+										scheduleMove(endAt, card.id, currentBoardId, 'Doing', 'Done');
+									}
+								}
+							}catch(e){ /* non-blocking */ }
+
+							// Inline time fields replace pop-up workflow; nothing to do here.
 						});
 
 						// render cards
 						list.cards.forEach(card =>{
 							const cnode = cardTemplate.content.cloneNode(true);
 							cnode.querySelector('.card-title-text').textContent = card.title;
-							cnode.querySelector('.card-due-text').textContent = card.due ? new Date(card.due).toLocaleString() : '';
+							// Show a concise status label under the title (Start or End)
+							const dueTextEl = cnode.querySelector('.card-due-text');
+							const nowT = Date.now();
+							const startT = card.start ? Date.parse(card.start) : null;
+							const endT = card.end ? Date.parse(card.end) : null;
+							if(!card.done){
+								if(startT && nowT < startT){
+									dueTextEl.textContent = 'Starts: ' + new Date(card.start).toLocaleString();
+								} else if(endT && nowT < endT){
+									dueTextEl.textContent = 'Ends: ' + new Date(card.end).toLocaleString();
+								} else { dueTextEl.textContent = ''; }
+							} else { dueTextEl.textContent = ''; }
 							const completeBtn = cnode.querySelector('.complete');
 							const cardEl = cnode.querySelector('.card-item');
+							// Enable drag & drop
+							cardEl.draggable = true;
+							cardEl.dataset.cardId = String(card.id);
+							cardEl.dataset.boardId = String(state.boards[bi].id);
+							cardEl.dataset.listName = list.name;
+							cardEl.addEventListener('dragstart', (ev)=>{
+								const dt = ev.dataTransfer; if(!dt) return;
+								dt.setData('text/plain', JSON.stringify({ cardId: card.id, fromBoardId: state.boards[bi].id, fromListName: list.name }));
+								ev.dataTransfer.effectAllowed = 'move';
+							});
 							if(card.done) cardEl.classList.add('done');
 							completeBtn.addEventListener('click', (ev)=>{
 								// compute next state first
@@ -148,16 +326,49 @@
 								}
 								card.done = willBeDone;
 								saveState(); render();
+								// If just marked done, move to Done board -> Done list
+								try{
+									if(willBeDone){
+										const currentBoardId = state.boards[bi].id;
+										// ensure list within same board and move
+										ensureList(state.boards[bi], 'Done');
+										moveCardWithinBoard(card.id, currentBoardId, list.name, 'Done');
+										render();
+									}
+								}catch(e){ /* non-blocking */ }
 							});
-							// set countdown element dataset for ticking
+							// Set countdown independent of list: prioritize upcoming Start, then upcoming End
 							const countdown = cnode.querySelector('.countdown');
-							if(card.due && !card.done){ countdown.dataset.due = card.due; }
+							if(!card.done){
+								if(startT && nowT < startT){ countdown.dataset.due = card.start; countdown.dataset.what = 'Start in'; }
+								else if(endT && nowT < endT){ countdown.dataset.due = card.end; countdown.dataset.what = 'End in'; }
+								else { countdown.dataset.due = ''; countdown.textContent = ''; countdown.removeAttribute('data-what'); }
+							} else { countdown.dataset.due = ''; countdown.textContent = ''; countdown.removeAttribute('data-what'); }
 							cardsContainer.appendChild(cnode);
 							// entrance animation for the new card
 							requestAnimationFrame(()=>{ if(cardEl) cardEl.classList.add('enter'); });
 						});
 
-						listsEl.appendChild(node);
+							// Make lists drop targets
+							listEl.addEventListener('dragover', (ev)=>{ ev.preventDefault(); if(ev.dataTransfer) ev.dataTransfer.dropEffect = 'move'; });
+							listEl.addEventListener('drop', (ev)=>{
+								ev.preventDefault();
+								try{
+									const data = ev.dataTransfer.getData('text/plain');
+									const payload = JSON.parse(data);
+									const { cardId, fromBoardId, fromListName } = payload;
+									const toBoardId = state.boards[bi].id;
+									const toListName = list.name;
+									if(fromBoardId === toBoardId){
+										moveCardWithinBoard(cardId, toBoardId, fromListName, toListName);
+									} else {
+										moveCardAcrossBoards(cardId, fromBoardId, fromListName, toBoardId, toListName);
+									}
+									render();
+								}catch(e){ /* ignore malformed drops */ }
+							});
+
+							listsEl.appendChild(node);
 					});
 
 					boardsEl.appendChild(boardEl);
@@ -178,12 +389,18 @@
 			function tick(){
 				document.querySelectorAll('.countdown').forEach(el=>{
 					const due = el.dataset.due; if(!due) { el.textContent = ''; return; }
+					const label = el.dataset.what || 'Due in';
 					const ms = new Date(due) - new Date();
-					if(ms <= 0){ el.textContent = 'Due now';
-						// notify and clear dataset so we don't notify continuously
-						if(!el.dataset.notified){ notify('Task due', el.previousElementSibling.querySelector('.card-title-text')?.textContent || 'Task is due'); el.dataset.notified = '1'; }
+					if(ms <= 0){
+						el.textContent = (label === 'Start in') ? 'Starts now' : (label === 'End in') ? 'Ends now' : 'Due now';
+						// notify once and clear to avoid repeat spam
+						if(!el.dataset.notified){
+							const title = el.previousElementSibling.querySelector('.card-title-text')?.textContent || 'Task';
+							notify(label.replace(' in','') + ' reached', title);
+							el.dataset.notified = '1';
+						}
 					} else {
-						el.textContent = formatMs(ms);
+						el.textContent = label + ' ' + formatMs(ms);
 					}
 				});
 			}
@@ -211,7 +428,8 @@
 
 			createBoardBtn.addEventListener('click', ()=>{
 				const name = newBoardName.value.trim(); if(!name) return alert('Enter board name');
-				state.boards.push({ id: Date.now()+Math.random(), name, lists: [ { name: 'To Do', cards: [] }, { name: 'Doing', cards: [] }, { name: 'Done', cards: [] } ] });
+				// Small task board: start with a single 'To Do' list by default
+				state.boards.push({ id: Date.now()+Math.random(), name, lists: [ { name: 'To Do', cards: [] } ] });
 				newBoardName.value = '';
 				saveState(); render();
 			});

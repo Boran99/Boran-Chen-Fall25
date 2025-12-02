@@ -189,19 +189,34 @@ main{padding:16px}
 .boards{
     display:flex;
     gap:24px;
-    overflow:auto;
+    /* allow boards to wrap to the next row instead of endless horizontal scroll */
+    flex-wrap:wrap;
+    overflow:visible;
     padding:24px;
     padding-bottom:40px;
     scroll-padding:24px;
-    scroll-snap-type:x mandatory;
+    /* disable snap when wrapping */
+    scroll-snap-type:none;
 }
-.board{min-width:320px;background:transparent}
+.board{
+    min-width:320px;
+    background:transparent;
+    /* participate in wrapping and shrink/grow gracefully */
+    flex:1 1 320px;
+    max-width:100%;
+}
 .board-header{display:flex;justify-content:space-between;align-items:center;margin:6px 0 8px}
 .board-header h3{margin:0}
 .delete-board{background:transparent;border:none;color:var(--muted);font-size:20px;padding:4px 8px;border-radius:4px;line-height:1}
 .delete-board:hover{background:rgba(0,0,0,0.05);color:var(--danger)}
 .lists{display:flex;gap:12px}
 .list{width:260px;background:var(--card);padding:10px;border-radius:8px;box-shadow:0 4px 14px rgba(20,20,20,0.04)}
+.inline-picker{margin-top:6px;padding:8px;border:1px solid rgba(0,0,0,0.08);border-radius:8px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.inline-picker .picker-row{display:flex;gap:8px}
+.inline-picker .picker-actions{display:flex;gap:8px;margin-top:8px}
+.inline-picker button{padding:6px 10px;border-radius:6px;border:1px solid rgba(0,0,0,0.1);background:#f8fafc}
+.inline-picker button:hover{background:#eef2ff}
+.hidden{display:none}
 .list-header{
     display:flex;
     justify-content:space-between;
@@ -294,8 +309,47 @@ main{padding:16px}
 	.board{min-width:280px}
 }
 
+/* Stack boards vertically on narrower screens */
+@media (max-width: 900px){
+    .boards{
+        flex-direction:column;
+        align-items:stretch;
+    }
+    .board{
+        min-width:auto;
+        width:100%;
+    }
+}
+
 /* fireworks canvas */
 .fireworks-canvas{position:fixed;inset:0;pointer-events:none;z-index:9999}
+
+/* Board edge hover animation */
+.board{
+    position:relative;
+}
+.board.small-board::before {
+    content:"";
+    position:absolute;
+    inset:-4px; /* a bit wider halo */
+    border-radius:12px;
+    pointer-events:none;
+    background:rgba(255,255,255,0.0); /* no color tint */
+    box-shadow:0 0 0 rgba(0,0,0,0); /* start with no shadow */
+    opacity:0;
+    transition:opacity .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.board.small-board:hover::before{
+    /* Neutral soft halo for floating sensation */
+    box-shadow:0 12px 24px rgba(0,0,0,0.14), 0 6px 12px rgba(0,0,0,0.10);
+    opacity:1;
+}
+
+/* Floating sensation: subtle lift and scale, stronger shadow */
+.board.small-board:hover {
+    transform:translateY(-3px) scale(1.01);
+    transition:transform .18s ease, box-shadow .18s ease;
+}
 
 /* CSS Fireworks (no canvas) */
 .fw-overlay{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:visible}
@@ -316,9 +370,34 @@ main{padding:16px}
     80%{ transform: translate(0,0) rotate(var(--ang)) translate(var(--dist,120px)); }
     100%{ transform: translate(0,0) rotate(var(--ang)) translate(calc(var(--dist,120px) * 1.05)); }
 }
+
+/* Finale flash overlay */
+.fw-flash{
+    position:absolute;
+    inset:0;
+    background:#fff;
+    opacity:0;
+    animation:fw-flash 520ms ease-out forwards;
+}
+@keyframes fw-flash{
+    0%{opacity:0}
+    20%{opacity:.28}
+    100%{opacity:0}
+}
 @keyframes fw-spark-fade{
     0%{ opacity:1; }
     60%{ opacity:1; }
     100%{ opacity:0; }
 }
+
+/* Small board vertical time layout and containment */
+.board.small-board{max-width:380px; overflow:hidden}
+.board.small-board .lists{flex-direction:column; align-items:stretch}
+.board.small-board .list{width:100%; max-width:360px}
+.add-card-row{gap:10px}
+.add-card-row .row{flex-direction:column; align-items:stretch}
+.add-card-row .time-field{display:flex; flex-direction:column; gap:4px}
+.add-card-row .time-label{font-size:12px; color:var(--muted); font-weight:600}
+.add-card-row input.card-start,
+.add-card-row input.card-end{width:100%}
 
