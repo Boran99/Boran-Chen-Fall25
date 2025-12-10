@@ -25,6 +25,18 @@
 
 		<!-- login removed; single-user demo -->
 
+		<!-- Detail Modal -->
+		<div id="detailModal" class="modal hidden">
+			<div class="modal-card">
+				<h3 id="modalTitle" style="margin-top:0"></h3>
+				<div id="modalDesc" style="margin:12px 0; white-space: pre-wrap; color: #4b5563;"></div>
+				<div id="modalTime" class="muted" style="margin-bottom:16px; font-size: 0.9em;"></div>
+				<div style="text-align:right">
+					<button id="closeModal" style="background:var(--primary); color:white; border:none; padding:8px 16px; border-radius:6px;">Close</button>
+				</div>
+			</div>
+		</div>
+
 		<!-- Add-board button -->
 		<div class="add-board">
 			<input id="newBoardName" placeholder="New board name" />
@@ -40,6 +52,7 @@
 				<div class="cards"></div>
 				<div class="add-card-row hidden">
 					<input class="card-title" placeholder="Card title" />
+					<textarea class="card-desc" placeholder="Description (optional)" rows="3"></textarea>
 					<div class="row">
 						<div class="time-field">
 							<div class="time-label">Start Time</div>
@@ -85,6 +98,10 @@
 					<div class="card-due-text muted"></div>
 				</div>
 				<div class="card-actions">
+					<button class="details-btn" title="View Details">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+					</button>
+					<button class="doing">Doing</button>
 					<button class="complete">Done</button>
 				</div>
 				<div class="countdown muted"></div>
@@ -202,6 +219,7 @@
 						const saveBtn = node.querySelector('.save-card');
 						const cancelBtn = node.querySelector('.cancel-card');
 						const titleInput = node.querySelector('.card-title');
+						const descInput = node.querySelector('.card-desc');
 						const startInput = node.querySelector('.card-start');
 						const endInput = node.querySelector('.card-end');
 						const startPicker = node.querySelector('.start-picker');
@@ -238,13 +256,20 @@
 												}
 												endPicker.classList.add('hidden');
 											});
-						cancelBtn.addEventListener('click', ()=>{ addRow.classList.add('hidden'); titleInput.value=''; if(startInput){ startInput.value=''; startInput.dataset.iso=''; } if(endInput){ endInput.value=''; endInput.dataset.iso=''; } });
+						cancelBtn.addEventListener('click', ()=>{ 
+							addRow.classList.add('hidden'); 
+							titleInput.value=''; 
+							if(descInput) descInput.value='';
+							if(startInput){ startInput.value=''; startInput.dataset.ts=''; } 
+							if(endInput){ endInput.value=''; endInput.dataset.ts=''; } 
+						});
 
 
 
 
 											saveBtn.addEventListener('click', ()=>{
 							const title = titleInput.value.trim();
+							const description = descInput ? descInput.value.trim() : '';
 												const startTs = startInput && startInput.dataset.ts ? Number(startInput.dataset.ts) : null;
 												const endTs = endInput && endInput.dataset.ts ? Number(endInput.dataset.ts) : null;
 							if(!title) return alert('Title required');
@@ -256,7 +281,7 @@
 							}
 												const start = startTs ? new Date(startTs).toISOString() : null;
 												const end = endTs ? new Date(endTs).toISOString() : null;
-												const card = { id: Date.now()+Math.random(), title, start, end, created: new Date().toISOString(), done: false };
+												const card = { id: Date.now()+Math.random(), title, description, start, end, created: new Date().toISOString(), done: false };
 							state.boards[bi].lists[li].cards.push(card);
 							saveState();
 							render();
@@ -297,14 +322,15 @@
 							const nowT = Date.now();
 							const startT = card.start ? Date.parse(card.start) : null;
 							const endT = card.end ? Date.parse(card.end) : null;
-							if(!card.done){
-								if(startT && nowT < startT){
-									dueTextEl.textContent = 'Starts: ' + new Date(card.start).toLocaleString();
-								} else if(endT && nowT < endT){
-									dueTextEl.textContent = 'Ends: ' + new Date(card.end).toLocaleString();
-								} else { dueTextEl.textContent = ''; }
+							
+							if(startT && nowT < startT){
+								dueTextEl.textContent = 'Starts: ' + new Date(card.start).toLocaleString();
+							} else if(endT && nowT < endT){
+								dueTextEl.textContent = 'Ends: ' + new Date(card.end).toLocaleString();
 							} else { dueTextEl.textContent = ''; }
+							
 							const completeBtn = cnode.querySelector('.complete');
+							const doingBtn = cnode.querySelector('.doing');
 							const cardEl = cnode.querySelector('.card-item');
 							// Enable drag & drop
 							cardEl.draggable = true;
@@ -317,6 +343,33 @@
 								ev.dataTransfer.effectAllowed = 'move';
 							});
 							if(card.done) cardEl.classList.add('done');
+
+							const detailsBtn = cnode.querySelector('.details-btn');
+							detailsBtn.addEventListener('click', ()=>{
+								const modal = document.getElementById('detailModal');
+								const mTitle = document.getElementById('modalTitle');
+								const mDesc = document.getElementById('modalDesc');
+								const mTime = document.getElementById('modalTime');
+								
+								mTitle.textContent = card.title;
+								mDesc.textContent = card.description || 'No description provided.';
+								
+								let timeText = '';
+								if(card.start) timeText += 'Start: ' + new Date(card.start).toLocaleString() + '\n';
+								if(card.end) timeText += 'End: ' + new Date(card.end).toLocaleString();
+								mTime.textContent = timeText;
+								
+								modal.classList.remove('hidden');
+							});
+
+							// Doing button logic
+							if(list.name === 'Doing' || card.done) doingBtn.style.display = 'none';
+							doingBtn.addEventListener('click', ()=>{
+								ensureList(state.boards[bi], 'Doing');
+								moveCardWithinBoard(card.id, state.boards[bi].id, list.name, 'Doing');
+								render();
+							});
+
 							completeBtn.addEventListener('click', (ev)=>{
 								// compute next state first
 								const willBeDone = !card.done;
@@ -342,11 +395,11 @@
 							});
 							// Set countdown independent of list: prioritize upcoming Start, then upcoming End
 							const countdown = cnode.querySelector('.countdown');
-							if(!card.done){
-								if(startT && nowT < startT){ countdown.dataset.due = card.start; countdown.dataset.what = 'Start in'; }
-								else if(endT && nowT < endT){ countdown.dataset.due = card.end; countdown.dataset.what = 'End in'; }
-								else { countdown.dataset.due = ''; countdown.textContent = ''; countdown.removeAttribute('data-what'); }
-							} else { countdown.dataset.due = ''; countdown.textContent = ''; countdown.removeAttribute('data-what'); }
+							
+							if(startT && nowT < startT){ countdown.dataset.due = card.start; countdown.dataset.what = 'Start in'; }
+							else if(endT && nowT < endT){ countdown.dataset.due = card.end; countdown.dataset.what = 'End in'; }
+							else { countdown.dataset.due = ''; countdown.textContent = ''; countdown.removeAttribute('data-what'); }
+							
 							cardsContainer.appendChild(cnode);
 							// entrance animation for the new card
 							requestAnimationFrame(()=>{ if(cardEl) cardEl.classList.add('enter'); });
@@ -438,6 +491,20 @@
 			});
 
 					render();
+
+			// Modal close logic
+			const detailModal = document.getElementById('detailModal');
+			const closeModalBtn = document.getElementById('closeModal');
+			if(closeModalBtn){
+				closeModalBtn.addEventListener('click', ()=>{
+					detailModal.classList.add('hidden');
+				});
+			}
+			if(detailModal){
+				detailModal.addEventListener('click', (e)=>{
+					if(e.target === detailModal) detailModal.classList.add('hidden');
+				});
+			}
 
 			// request notification permission on first load (non-blocking)
 			if('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
